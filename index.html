@@ -130,15 +130,24 @@
   .kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--brand)}
   .kpi .kl{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--ink-3)}
   .kpi .kv{font-family:var(--font-n);font-size:24px;font-weight:600;margin-top:4px}
-  .modalBg{position:fixed;inset:0;background:rgba(16,36,58,.45);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:50px 16px;overflow-y:auto}
-  .modalBox{background:#fff;border-radius:14px;width:100%;max-width:640px;box-shadow:0 28px 64px -18px rgba(16,36,58,.26)}
-  .modalHead{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)}
-  .modalBody{padding:20px;max-height:70vh;overflow-y:auto}
   .tabx{border:none;background:transparent;color:var(--ink-3);font-weight:600;font-size:12.5px;padding:7px 12px;border-radius:8px;cursor:pointer}
   .tabx.on{background:var(--surface-2);color:var(--brand)}
+  .namaLink{background:none;border:none;padding:0;font:inherit;font-weight:600;color:var(--ink);cursor:pointer;text-align:left;display:inline-flex;align-items:center;gap:7px}
+  .namaLink:hover{color:var(--brand)}
+  .namaLink:focus-visible,.btn:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:6px}
+  .chev{width:11px;height:11px;flex:none;transition:transform .15s}
+  [aria-expanded="true"] > .chev{transform:rotate(90deg)}
+  .aksiCell{display:flex;gap:6px;justify-content:flex-end;align-items:center}
+  .btn-del{font-size:16px;line-height:1;padding:5px 10px}
+  .btn-del:hover{color:var(--danger);border-color:#eec6c1;background:var(--danger-tint)}
+  tr.rowOpen td{background:var(--surface-2);border-bottom-color:transparent}
+  tr.rowOpen td:first-child{border-left:3px solid var(--brand)}
+  td.detailCell{padding:16px 20px 18px;background:var(--surface-2);border-left:3px solid var(--brand);color:var(--ink)}
+  .detailFoot{text-align:right;margin-top:4px}
+  .card table{min-width:600px}
   .jawabBlock{margin-bottom:16px}
   .jawabBlock .jq{font-weight:700;font-size:13px;margin-bottom:4px}
-  .jawabBlock .ja{background:var(--surface-2);border-radius:9px;padding:10px 12px;font-size:13px;white-space:pre-wrap;color:var(--ink)}
+  .jawabBlock .ja{background:#fff;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:13px;white-space:pre-wrap;color:var(--ink)}
 </style>
 </head>
 <body>
@@ -329,7 +338,7 @@
         <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px">
           <div><span class="subt">Peserta</span><h1 class="pageTitle">Daftar peserta terdaftar</h1></div>
         </div>
-        <div class="card"><table><thead><tr><th>Nama</th><th>Unit/Departemen</th><th>Status</th><th></th></tr></thead>
+        <div class="card" style="overflow-x:auto"><table><thead><tr><th>Nama</th><th>Unit/Departemen</th><th>Status</th><th></th></tr></thead>
         <tbody id="tblPeserta"></tbody></table></div>
       </section>
 
@@ -341,21 +350,10 @@
           <select id="selInstansiHasil" class="inp"></select></div>
           <button id="btnMuatUlangHasil" class="btn btn-ghost" style="margin-top:20px">Muat ulang</button>
         </div>
-        <div class="card"><table><thead><tr><th>Nama</th><th>Unit/Departemen</th><th>Progres</th><th>Status</th><th style="text-align:right">Aksi</th></tr></thead>
+        <div class="card" style="overflow-x:auto"><table><thead><tr><th>Nama</th><th>Unit/Departemen</th><th>Progres</th><th>Status</th><th style="text-align:right">Aksi</th></tr></thead>
         <tbody id="tblHasil"></tbody></table></div>
         <p id="waktuMuatHasil" style="font-size:11.5px;color:var(--ink-3);margin-top:8px"></p>
       </section>
-    </div>
-  </div>
-</div>
-
-<div id="modalJawaban" class="modalBg hide">
-  <div class="modalBox">
-    <div class="modalHead"><div><b id="modalJawabanNama">Peserta</b><div class="subt" id="modalJawabanInstansi"></div></div>
-      <button data-close class="btn btn-quiet sm">Tutup</button></div>
-    <div class="modalBody" id="modalJawabanBody"></div>
-    <div style="padding:14px 20px;border-top:1px solid var(--border);text-align:right">
-      <button id="btnCetakJawaban" class="btn btn-ghost sm">Cetak laporan</button>
     </div>
   </div>
 </div>
@@ -381,13 +379,29 @@ import {
   getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, getDocs, deleteDoc, collection, query, where, Timestamp
+  initializeFirestore, doc, getDoc, setDoc, getDocs, deleteDoc, collection, query, where, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
 const $ = (id) => document.getElementById(id);
+/* Batas waktu agar tombol tidak berputar tanpa akhir, dan pesan galat yang mudah dipahami. */
+const esc = (t) => String(t ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+function batasWaktu(promise, ms, pesan) {
+  let t;
+  const limit = new Promise((_, rej) => { t = setTimeout(() => rej(new Error(pesan)), ms); });
+  return Promise.race([promise, limit]).finally(() => clearTimeout(t));
+}
+function pesanGalat(e) {
+  const kode = (e && e.code) || "";
+  if (kode === "auth/operation-not-allowed" || kode === "auth/admin-restricted-operation") return "Login anonim belum diaktifkan di Firebase Authentication.";
+  if (kode === "auth/too-many-requests") return "Terlalu banyak percobaan dari jaringan ini. Tunggu beberapa menit lalu coba lagi.";
+  if (kode === "auth/network-request-failed") return "Koneksi ke server gagal. Periksa internet Anda.";
+  if (kode === "permission-denied") return "Akses ditolak oleh aturan Firestore. Hubungi fasilitator.";
+  return (e && e.message) || "Terjadi kesalahan.";
+}
+
 function tampilkan(id) {
   ["layarLanding","layarRefleksi","layarSelesai"].forEach(x => $(x).classList.toggle("hide", x !== id));
 }
@@ -460,6 +474,7 @@ $("btnMulaiPeserta").onclick = async () => {
   $("btnMulaiPeserta").disabled = true; $("btnMulaiPeserta").innerHTML = '<span class="spin"></span>';
   sedangRegistrasiPeserta = true;
   try {
+    const { user, profilBaru } = await batasWaktu((async () => {
     let user = auth.currentUser;
     if (!user) {
       const cred = await signInAnonymously(auth);
@@ -479,6 +494,8 @@ $("btnMulaiPeserta").onclick = async () => {
     }
 
     const profilBaru = (await getDoc(profRef)).data();
+    return { user, profilBaru };
+    })(), 25000, "Server tidak merespons. Periksa koneksi internet atau coba jaringan lain, lalu ulangi.");
     sedangRegistrasiPeserta = false;
     $("layarLogin").classList.add("hide");
     $("areaAdmin").classList.add("hide");
@@ -486,7 +503,7 @@ $("btnMulaiPeserta").onclick = async () => {
     await routerPeserta(user, profilBaru);
   } catch (e) {
     sedangRegistrasiPeserta = false;
-    errLoginPeserta("Gagal memulai: " + e.message + ". Periksa koneksi internet dan coba lagi.");
+    errLoginPeserta("Gagal memulai: " + pesanGalat(e));
   }
   $("btnMulaiPeserta").disabled = false; $("btnMulaiPeserta").innerText = "Mulai Pengisian";
 };
@@ -694,11 +711,10 @@ document.querySelectorAll(".navBtn").forEach(btn => btn.onclick = () => {
   btn.classList.add("on");
   $(btn.dataset.tab).classList.add("on");
 });
-document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => {
-  document.querySelectorAll(".modalBg").forEach(m => m.classList.add("hide"));
-});
 
-let semuaPeserta = [];
+let semuaPeserta = [], progMapTerakhir = {};
+const terbuka = new Set();
+const cacheJawaban = {};
 
 async function muatSemuaAdmin() {
   const [pesertaSnap, progSnap] = await Promise.all([
@@ -712,6 +728,8 @@ async function muatSemuaAdmin() {
   $("kpiPeserta").innerText = semuaPeserta.length;
   $("kpiSelesai").innerText = selesaiCount;
 
+  progMapTerakhir = progMap;
+  $("waktuMuatHasil").innerText = "Terakhir dimuat: " + new Date().toLocaleTimeString("id-ID");
   renderPesertaAdmin(progMap);
   isiSelectInstansiAdmin();
   renderHasilAdmin(progMap);
@@ -722,9 +740,9 @@ function renderPesertaAdmin(progMap) {
   $("tblPeserta").innerHTML = semuaPeserta.map(p => {
     const status = progMap[p.id]?.status || "belum_mulai";
     const st = STATUS[status];
-    return `<tr><td style="color:var(--ink);font-weight:600">${p.nama}</td><td>${p.instansi || "-"}</td>
+    return `<tr><td style="color:var(--ink);font-weight:600">${esc(p.nama)}</td><td>${esc(p.instansi) || "-"}</td>
       <td><span class="badge ${st[1]}"><span class="d"></span>${st[0]}</span></td>
-      <td style="text-align:right"><button class="btn btn-ghost sm" data-hapuspeserta="${p.id}" title="Hapus peserta">&times;</button></td></tr>`;
+      <td style="text-align:right"><button class="btn btn-ghost sm btn-del" data-hapuspeserta="${p.id}" title="Hapus peserta">&times;</button></td></tr>`;
   }).join("") || '<tr><td colspan="4" style="text-align:center;color:var(--ink-3);padding:30px">Belum ada peserta.</td></tr>';
 
   document.querySelectorAll("[data-hapuspeserta]").forEach(btn => btn.onclick = () => hapusPeserta(btn.dataset.hapuspeserta));
@@ -732,10 +750,20 @@ function renderPesertaAdmin(progMap) {
 
 async function hapusPeserta(uid) {
   const p = semuaPeserta.find(x => x.id === uid);
-  if (!confirm(`Hapus peserta "${p ? p.nama : uid}"? Tindakan ini tidak bisa dibatalkan.`)) return;
-  await deleteDoc(doc(db, "reflections", uid)).catch(() => {});
-  await deleteDoc(doc(db, "participantProgress", uid)).catch(() => {});
-  await deleteDoc(doc(db, "profiles", uid));
+  const label = p ? `"${p.nama}"${p.instansi ? " (" + p.instansi + ")" : ""}` : uid;
+  if (!confirm(`Hapus peserta ${label}?\nSemua jawabannya ikut terhapus dan tidak bisa dibatalkan.`)) return;
+
+  const gagal = [];
+  await deleteDoc(doc(db, "reflections", uid)).catch(e => gagal.push(e));
+  await deleteDoc(doc(db, "participantProgress", uid)).catch(e => gagal.push(e));
+  try {
+    await deleteDoc(doc(db, "profiles", uid));
+  } catch (e) {
+    alert("Peserta belum terhapus: " + pesanGalat(e));
+    return;
+  }
+  if (gagal.length) alert("Peserta terhapus dari daftar, tetapi sebagian data jawabannya tidak bisa dihapus (" + pesanGalat(gagal[0]) + "). Periksa Firestore rules.");
+  terbuka.delete(uid); delete cacheJawaban[uid];
   muatSemuaAdmin();
 }
 
@@ -748,63 +776,95 @@ function isiSelectInstansiAdmin() {
 }
 
 $("selInstansiHasil").onchange = () => muatSemuaAdmin();
-$("btnMuatUlangHasil").onclick = () => muatSemuaAdmin();
+$("btnMuatUlangHasil").onclick = () => { Object.keys(cacheJawaban).forEach(k => delete cacheJawaban[k]); muatSemuaAdmin(); };
+
+const CHEV = '<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2l4 4-4 4"/></svg>';
+const STATUS_HASIL = { belum_mulai: ["Belum mulai", "b-frz"], sedang_mengerjakan: ["Mengerjakan", "b-warn"], selesai: ["Selesai", "b-ok"] };
+
+function htmlDetail(uid) {
+  const j = cacheJawaban[uid];
+  if (!j) return '<span style="color:var(--ink-3)">Memuat jawaban...</span>';
+  const isi = QUESTIONS.map(q => `
+    <div class="jawabBlock"><div class="jq">${esc(q.question)}</div>
+    <div class="ja">${esc(j[q.key] || "(belum diisi)")}</div></div>`).join("");
+  return isi + `<div class="detailFoot"><button type="button" class="btn btn-ghost sm" data-cetak="${uid}">Cetak laporan</button></div>`;
+}
+
+async function muatDetail(uid) {
+  try {
+    const snap = await getDoc(doc(db, "reflections", uid));
+    cacheJawaban[uid] = snap.exists() ? snap.data() : {};
+  } catch (e) {
+    const el = $("det-" + uid);
+    if (el) el.innerHTML = '<span style="color:var(--danger)">Gagal memuat jawaban: ' + esc(pesanGalat(e)) + ' Tutup lalu buka lagi untuk mencoba ulang.</span>';
+    return;
+  }
+  const el = $("det-" + uid);
+  if (el) el.innerHTML = htmlDetail(uid);
+}
 
 async function renderHasilAdmin(progMap) {
-  $("waktuMuatHasil").innerText = "Terakhir dimuat: " + new Date().toLocaleTimeString("id-ID");
   const instansiTerpilih = $("selInstansiHasil").value;
   const pesertaTersaring = instansiTerpilih ? semuaPeserta.filter(p => p.instansi === instansiTerpilih) : semuaPeserta;
 
   $("tblHasil").innerHTML = pesertaTersaring.map(p => {
     const prog = progMap[p.id] || {};
     const jumlah = prog.jumlahJawab || 0;
-    const STATUS = { belum_mulai: ["Belum mulai", "b-frz"], sedang_mengerjakan: ["Mengerjakan", "b-warn"], selesai: ["Selesai", "b-ok"] };
-    const st = STATUS[prog.status || "belum_mulai"];
-    const aksi = jumlah > 0 ? `<button class="btn btn-ghost sm" data-lihat="${p.id}">Lihat jawaban</button>` : "-";
-    return `<tr><td style="color:var(--ink);font-weight:600">${p.nama}</td><td>${p.instansi || "-"}</td>
+    const st = STATUS_HASIL[prog.status || "belum_mulai"];
+    const dibuka = jumlah > 0 && terbuka.has(p.id);
+    const nama = jumlah > 0
+      ? `<button type="button" class="namaLink" data-toggle="${p.id}" aria-expanded="${dibuka}" title="${dibuka ? "Tutup jawaban" : "Lihat jawaban"}">${CHEV}${esc(p.nama)}</button>`
+      : esc(p.nama);
+    const lihat = jumlah > 0
+      ? `<button type="button" class="btn btn-ghost sm" data-toggle="${p.id}" aria-expanded="${dibuka}">${dibuka ? "Tutup jawaban" : "Lihat jawaban"}</button>`
+      : "";
+    const hapus = `<button type="button" class="btn btn-ghost sm btn-del" data-hapus="${p.id}" title="Hapus peserta" aria-label="Hapus peserta ${esc(p.nama)}">&times;</button>`;
+    const baris = `<tr class="${dibuka ? "rowOpen" : ""}"><td style="color:var(--ink);font-weight:600">${nama}</td><td>${esc(p.instansi) || "-"}</td>
       <td class="mono">${jumlah}/${QUESTIONS.length}</td>
       <td><span class="badge ${st[1]}"><span class="d"></span>${st[0]}</span></td>
-      <td style="text-align:right">${aksi}</td></tr>`;
+      <td><div class="aksiCell">${lihat}${hapus}</div></td></tr>`;
+    const detail = dibuka ? `<tr class="rowDetail"><td class="detailCell" colspan="5" id="det-${p.id}">${htmlDetail(p.id)}</td></tr>` : "";
+    return baris + detail;
   }).join("") || '<tr><td colspan="5" style="text-align:center;color:var(--ink-3);padding:30px">Belum ada peserta.</td></tr>';
 
-  document.querySelectorAll("[data-lihat]").forEach(btn => btn.onclick = () => lihatJawaban(btn.dataset.lihat));
+  pesertaTersaring.forEach(p => {
+    if ((progMap[p.id]?.jumlahJawab || 0) > 0 && terbuka.has(p.id) && !cacheJawaban[p.id]) muatDetail(p.id);
+  });
 }
 
-let jawabanAktif = null;
-async function lihatJawaban(uid) {
-  const p = semuaPeserta.find(x => x.id === uid);
-  const refSnap = await getDoc(doc(db, "reflections", uid));
-  const jawaban = refSnap.exists() ? refSnap.data() : {};
-  jawabanAktif = { p, jawaban };
+$("tblHasil").addEventListener("click", (e) => {
+  const t = e.target.closest("[data-toggle],[data-hapus],[data-cetak]");
+  if (!t) return;
+  if (t.dataset.toggle) {
+    const id = t.dataset.toggle;
+    if (terbuka.has(id)) terbuka.delete(id); else terbuka.add(id);
+    renderHasilAdmin(progMapTerakhir);
+  } else if (t.dataset.hapus) {
+    hapusPeserta(t.dataset.hapus);
+  } else if (t.dataset.cetak) {
+    const p = semuaPeserta.find(x => x.id === t.dataset.cetak);
+    if (p) cetakLaporan(p, cacheJawaban[p.id] || {});
+  }
+});
 
-  $("modalJawabanNama").innerText = p ? p.nama : uid;
-  $("modalJawabanInstansi").innerText = p ? (p.instansi || "-") : "";
-  $("modalJawabanBody").innerHTML = QUESTIONS.map(q => `
-    <div class="jawabBlock"><div class="jq">${q.question}</div>
-    <div class="ja">${(jawaban[q.key] || "(belum diisi)").replace(/</g,"&lt;")}</div></div>`).join("");
-  $("modalJawaban").classList.remove("hide");
-}
-
-$("btnCetakJawaban").onclick = () => {
-  if (!jawabanAktif) return;
-  const { p, jawaban } = jawabanAktif;
+function cetakLaporan(p, jawaban) {
   const w = window.open("", "_blank");
   if (!w) { alert("Browser memblokir jendela pop-up. Izinkan pop-up untuk situs ini, lalu klik Cetak lagi."); return; }
   const isiHtml = QUESTIONS.map(q => `
-    <div style="margin-bottom:18px"><div style="font-weight:700;font-size:14px;margin-bottom:4px">${q.question}</div>
-    <div style="background:#F4F8FC;border-left:3px solid #0A6CBF;border-radius:8px;padding:10px 12px;font-size:13px;white-space:pre-wrap">${(jawaban[q.key] || "(belum diisi)").replace(/</g,"&lt;")}</div></div>`).join("");
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Laporan Refleksi - ${p.nama}</title>
+    <div style="margin-bottom:18px"><div style="font-weight:700;font-size:14px;margin-bottom:4px">${esc(q.question)}</div>
+    <div style="background:#F4F8FC;border-left:3px solid #0A6CBF;border-radius:8px;padding:10px 12px;font-size:13px;white-space:pre-wrap">${esc(jawaban[q.key] || "(belum diisi)")}</div></div>`).join("");
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Laporan Refleksi - ${esc(p.nama)}</title>
     <style>body{font-family:Arial,Helvetica,sans-serif;padding:36px;color:#0F2238}
     h1{font-size:20px;margin-bottom:2px;color:#0A6CBF}p.sub{color:#4A5A6E;margin-top:0}</style></head>
     <body><h1>Leader Growth Reflection Canvas</h1>
     <p class="sub">Grow Together - Lead, Bridge, Unite - PT. Inti Pantja Press Industri</p>
-    <p><b>Nama:</b> ${p.nama}<br><b>Unit/Departemen:</b> ${p.instansi || "-"}</p>
+    <p><b>Nama:</b> ${esc(p.nama)}<br><b>Unit/Departemen:</b> ${esc(p.instansi) || "-"}</p>
     <hr style="border:none;border-top:2px solid #FFA302;margin:18px 0">
     ${isiHtml}
     </body></html>`);
   w.document.close();
   setTimeout(() => w.print(), 400);
-};
+}
 </script>
 </body>
 </html>
