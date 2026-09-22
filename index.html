@@ -289,9 +289,9 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
           Simpan PDF
         </button>
-        <button id="btnKirimRefleksi" class="btn btn-primary" disabled>Selesai &amp; Kirim</button>
+        <button id="btnKirimRefleksi" class="btn btn-primary">Selesai &amp; Kirim</button>
       </div>
-      <p id="hintLengkap" style="text-align:right;color:var(--ink-3);font-size:11.5px;margin-top:8px">Lengkapi keempat pertanyaan untuk mengirim.</p>
+      <p id="hintLengkap" style="text-align:right;color:var(--ink-3);font-size:11.5px;margin-top:8px">Jawaban tersimpan otomatis. Anda bisa mengirim kapan saja setelah keempat pertanyaan terisi.</p>
     </div></div>
   </main>
 
@@ -586,7 +586,13 @@ function renderTabsRefleksi() {
     <button class="tabRef ${i === idxSekarang ? "on" : ""} ${jawabanSaya[q.key] ? "filled" : ""}" data-i="${i}">
       <span class="ts"></span><div class="tn">${i + 1}/${QUESTIONS.length}</div><div class="tt">${q.title}</div>
     </button>`).join("");
-  [...$("tabsRefleksi").children].forEach(btn => btn.onclick = () => { idxSekarang = Number(btn.dataset.i); renderRefleksi(); });
+  [...$("tabsRefleksi").children].forEach(btn => btn.onclick = () => {
+    const keySebelumnya = QUESTIONS[idxSekarang].key;
+    const elSebelumnya = $(`jawab-${keySebelumnya}`);
+    if (elSebelumnya) { clearTimeout(elSebelumnya._autosaveTimer); simpanJawaban(keySebelumnya); }
+    idxSekarang = Number(btn.dataset.i);
+    renderRefleksi();
+  });
 }
 
 function renderPanelsRefleksi() {
@@ -619,7 +625,6 @@ function renderHitung() {
   $("hitungJawab").innerText = `${terisi}/${QUESTIONS.length} terisi`;
   $("barFill").style.width = Math.round((terisi / QUESTIONS.length) * 100) + "%";
   const semua = terisi === QUESTIONS.length;
-  $("btnKirimRefleksi").disabled = !semua;
   $("hintLengkap").classList.toggle("hide", semua);
   [...$("tabsRefleksi").children].forEach((btn, i) => btn.classList.toggle("filled", (jawabanSaya[QUESTIONS[i].key] || "").trim().length > 0));
 }
@@ -677,10 +682,16 @@ $("btnSimpanPdf").onclick = simpanPdfPeserta;
 $("btnSimpanPdfSelesai").onclick = simpanPdfPeserta;
 
 $("btnKirimRefleksi").onclick = async () => {
-  const terisi = QUESTIONS.filter(q => (jawabanSaya[q.key] || "").trim().length > 0).length;
-  if (terisi !== QUESTIONS.length) {
-    $("refleksiError").innerText = "Masih ada pertanyaan yang belum diisi.";
+  const keyAktif = QUESTIONS[idxSekarang].key;
+  const elAktif = $(`jawab-${keyAktif}`);
+  if (elAktif) { clearTimeout(elAktif._autosaveTimer); await simpanJawaban(keyAktif); }
+
+  const belumDiisi = QUESTIONS.filter(q => (jawabanSaya[q.key] || "").trim().length === 0);
+  if (belumDiisi.length > 0) {
+    $("refleksiError").innerText = `Masih ada ${belumDiisi.length} pertanyaan yang belum diisi: ${belumDiisi.map(q => q.title).join(", ")}.`;
     $("refleksiError").classList.remove("hide");
+    idxSekarang = QUESTIONS.indexOf(belumDiisi[0]);
+    renderRefleksi();
     return;
   }
   $("refleksiError").classList.add("hide");
